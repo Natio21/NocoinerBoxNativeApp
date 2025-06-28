@@ -31,7 +31,14 @@ class BTCViewer(QWidget):
         self.background_label.setAlignment(Qt.AlignCenter)
 
         # Cargar imagen original
-        original_pixmap = QPixmap("./splash.png")
+        original_pixmap = QPixmap("/home/nocoiner/NoCoinerBoxNativeApp/splash.png")
+        if original_pixmap.isNull():
+            original_pixmap = QPixmap("./splash.png")
+            if original_pixmap.isNull():
+                # Crea un fondo negro de emergencia
+                original_pixmap = QPixmap(480, 320)
+                original_pixmap.fill(Qt.black)
+
 
         # Recortar para obtener ratio 480:320 (3:2)
         img_width = original_pixmap.width()
@@ -53,6 +60,7 @@ class BTCViewer(QWidget):
 
         # Invertir colores
         inverted_pixmap = QPixmap(original_pixmap.size())
+
         inverted_pixmap.fill(Qt.black)
 
         painter = QPainter(inverted_pixmap)
