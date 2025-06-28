@@ -93,7 +93,7 @@ class BTCViewer(QWidget):
         timer.start(UPDATE_INTERVAL_MS)
 
         self.update_price()
-        #self.showFullScreen()
+        self.showFullScreen()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
