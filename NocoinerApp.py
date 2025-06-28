@@ -34,7 +34,7 @@ class BTCViewer(QWidget):
         original_pixmap = QPixmap("splash2.png")
 
         # Recortar para obtener ratio 480:320 (3:2)
-        img_width = original_pixmap.width()
+        '''img_width = original_pixmap.width()
         img_height = original_pixmap.height()
         target_ratio = 480 / 320  # = 1.5
 
@@ -49,7 +49,7 @@ class BTCViewer(QWidget):
             new_height = int(img_width / target_ratio)
             y_offset = (img_height - new_height) // 2
             original_pixmap = original_pixmap.copy(0, y_offset, img_width, new_height)
-
+        '''
 
         # Invertir colores
         inverted_pixmap = QPixmap(original_pixmap.size())
