@@ -30,9 +30,26 @@ class BTCViewer(QWidget):
         self.background_label = QLabel(self)
         self.background_label.setAlignment(Qt.AlignCenter)
 
-        # En el método __init__, modifica la carga y procesamiento de imagen:
-        # Cargar y procesar imagen
+        # Cargar imagen original
         original_pixmap = QPixmap("dosc.png")
+
+        # Recortar para obtener ratio 480:320 (3:2)
+        img_width = original_pixmap.width()
+        img_height = original_pixmap.height()
+        target_ratio = 480 / 320  # = 1.5
+
+        current_ratio = img_width / img_height
+        if current_ratio > target_ratio:
+            # La imagen es más ancha, recortar los lados
+            new_width = int(img_height * target_ratio)
+            x_offset = (img_width - new_width) // 2
+            original_pixmap = original_pixmap.copy(x_offset, 0, new_width, img_height)
+        else:
+            # La imagen es más alta, recortar arriba y abajo
+            new_height = int(img_width / target_ratio)
+            y_offset = (img_height - new_height) // 2
+            original_pixmap = original_pixmap.copy(0, y_offset, img_width, new_height)
+
 
         # Invertir colores
         inverted_pixmap = QPixmap(original_pixmap.size())
