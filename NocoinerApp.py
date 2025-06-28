@@ -84,6 +84,10 @@ class BTCViewer(QWidget):
         # Ajustar el fondo al tamaño completo de la ventana
         self.background_label.setGeometry(0, 0, self.width(), self.height())
 
+        # Calcular el 50% del tamaño de la ventana
+        target_width = int(self.width() * 0.5)
+        target_height = int(self.height() * 0.5)
+
         # Escalar la imagen al tamaño de la ventana sin mantener proporción para cubrir todo
         scaled_pixmap = self.original_dark_pixmap.scaled(
             self.width(), self.height(),
@@ -114,7 +118,7 @@ class BTCViewer(QWidget):
                 height = self.height()
                 x, y = self.press_pos.x(), self.press_pos.y()
 
-                if x > width * 0.8 and y > height * 0.8:
+                if x > width * 0.5 and y > height * 0.5:
                     self.close_button.setVisible(True)
 
         self.press_start_time = 0
