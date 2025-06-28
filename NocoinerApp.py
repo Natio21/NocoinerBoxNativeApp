@@ -31,7 +31,7 @@ class BTCViewer(QWidget):
         self.background_label.setAlignment(Qt.AlignCenter)
 
         # Cargar imagen original
-        original_pixmap = QPixmap("dosc.png")
+        original_pixmap = QPixmap("splash2.png")
 
         # Recortar para obtener ratio 480:320 (3:2)
         img_width = original_pixmap.width()
