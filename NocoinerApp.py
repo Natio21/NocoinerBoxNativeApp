@@ -64,7 +64,7 @@ class BTCViewer(QWidget):
         dark_pixmap = QPixmap(inverted_pixmap.size())
         dark_painter = QPainter(dark_pixmap)
         dark_painter.drawPixmap(0, 0, inverted_pixmap)
-        dark_painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 200))
+        dark_painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 150))
         dark_painter.end()
 
         self.original_dark_pixmap = dark_pixmap  # Guardar referencia del pixmap original
@@ -93,7 +93,7 @@ class BTCViewer(QWidget):
         timer.start(UPDATE_INTERVAL_MS)
 
         self.update_price()
-        self.showFullScreen()
+        #self.showFullScreen()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
