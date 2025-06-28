@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QTimer
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
 UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
-LONG_PRESS_DURATION = 5  # segundos para considerar como pulsación larga
+LONG_PRESS_DURATION = 2  # segundos para considerar como pulsación larga
 
 
 class BTCViewer(QWidget):
@@ -30,10 +30,11 @@ class BTCViewer(QWidget):
         self.background_label = QLabel(self)
         self.background_label.setAlignment(Qt.AlignCenter)
 
+        # En el método __init__, modifica la carga y procesamiento de imagen:
         # Cargar y procesar imagen
         original_pixmap = QPixmap("dosc.png")
 
-        # Invertir colores (opcional, según se necesite)
+        # Invertir colores
         inverted_pixmap = QPixmap(original_pixmap.size())
         inverted_pixmap.fill(Qt.black)
 
@@ -46,9 +47,12 @@ class BTCViewer(QWidget):
         dark_pixmap = QPixmap(inverted_pixmap.size())
         dark_painter = QPainter(dark_pixmap)
         dark_painter.drawPixmap(0, 0, inverted_pixmap)
-        # Pintar un rectángulo semitransparente negro para oscurecer
-        dark_painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 150))  # El 150 es el nivel de opacidad
+        dark_painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 200))
         dark_painter.end()
+
+        self.original_dark_pixmap = dark_pixmap  # Guardar referencia del pixmap original
+        self.background_label.setPixmap(dark_pixmap)
+        layout.addWidget(self.background_label)
 
         self.background_label.setPixmap(dark_pixmap)
         layout.addWidget(self.background_label)
@@ -75,9 +79,20 @@ class BTCViewer(QWidget):
         self.showFullScreen()
 
     def resizeEvent(self, event):
-        # Escalar la imagen al tamaño completo del widget al cambiar tamaño
         super().resizeEvent(event)
-        self.background_label.setFixedSize(self.size())
+
+        # Ajustar el fondo al tamaño completo de la ventana
+        self.background_label.setGeometry(0, 0, self.width(), self.height())
+
+        # Escalar la imagen al tamaño de la ventana sin mantener proporción para cubrir todo
+        scaled_pixmap = self.original_dark_pixmap.scaled(
+            self.width(), self.height(),
+            Qt.IgnoreAspectRatio, Qt.SmoothTransformation
+        )
+
+        # Actualizar la imagen mostrada
+        self.background_label.setPixmap(scaled_pixmap)
+
         # Centrar elementos en la pantalla
         self.label.setGeometry(0, self.height() // 2 - 50, self.width(), 100)
         self.close_button.setGeometry(
