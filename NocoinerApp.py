@@ -2,7 +2,7 @@ import sys
 import requests
 import time
 
-from PyQt5.QtGui import QPixmap, QPainter
+from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer
 
@@ -16,53 +16,55 @@ class BTCViewer(QWidget):
         super().__init__()
         # Configuración ventana
         self.setWindowTitle("BTC Price")
-        self.setStyleSheet("background-color: black;")
 
         # Variables para el clic prolongado
         self.press_start_time = 0
         self.press_pos = None
 
-        # Crear layout
+        # Crear layout principal
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)  # Eliminar márgenes
         self.setLayout(layout)
 
-        # Añadir imagen
-        '''self.image_label = QLabel(self)
-        pixmap = QPixmap("dosc.png")
-        self.image_label.setPixmap(pixmap)
-        self.image_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.image_label)'''
+        # Preparar imagen de fondo
+        self.background_label = QLabel(self)
+        self.background_label.setAlignment(Qt.AlignCenter)
 
-        # Añadir imagen
-        self.image_label = QLabel(self)
+        # Cargar y procesar imagen
         original_pixmap = QPixmap("dosc.png")
 
-        # Crear una nueva imagen con fondo negro
+        # Invertir colores (opcional, según se necesite)
         inverted_pixmap = QPixmap(original_pixmap.size())
         inverted_pixmap.fill(Qt.black)
 
-        # Pintar la imagen original con color invertido
         painter = QPainter(inverted_pixmap)
         painter.setCompositionMode(QPainter.CompositionMode_Difference)
         painter.drawPixmap(0, 0, original_pixmap)
         painter.end()
 
-        self.image_label.setPixmap(inverted_pixmap)
-        self.image_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.image_label)
+        # Oscurecer la imagen
+        dark_pixmap = QPixmap(inverted_pixmap.size())
+        dark_painter = QPainter(dark_pixmap)
+        dark_painter.drawPixmap(0, 0, inverted_pixmap)
+        # Pintar un rectángulo semitransparente negro para oscurecer
+        dark_painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 150))  # El 150 es el nivel de opacidad
+        dark_painter.end()
 
-        # Label para mostrar el precio
+        self.background_label.setPixmap(dark_pixmap)
+        layout.addWidget(self.background_label)
+
+        # Label para mostrar el precio (encima de la imagen)
         self.label = QLabel("Cargando...", self)
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("color: white; font-size: 128px;")
-        layout.addWidget(self.label)
+        self.label.setStyleSheet("color: white; font-size: 48px; font-weight: bold;")
+        self.label.raise_()  # Elevar por encima del fondo
 
         # Botón para cerrar (inicialmente oculto)
         self.close_button = QPushButton("Cerrar", self)
-        self.close_button.setStyleSheet("background-color: #333; color: white; font-size: 160px; padding: 80px;")
+        self.close_button.setStyleSheet("background-color: #333; color: white; font-size: 16px; padding: 8px;")
         self.close_button.clicked.connect(self.close)
-        layout.addWidget(self.close_button, alignment=Qt.AlignCenter)
-        self.close_button.setVisible(False)  # Inicialmente invisible
+        self.close_button.setVisible(False)
+        self.close_button.raise_()  # Elevar por encima del fondo
 
         # Temporizador para actualizar
         timer = QTimer(self)
@@ -72,23 +74,31 @@ class BTCViewer(QWidget):
         self.update_price()
         self.showFullScreen()
 
+    def resizeEvent(self, event):
+        # Escalar la imagen al tamaño completo del widget al cambiar tamaño
+        super().resizeEvent(event)
+        self.background_label.setFixedSize(self.size())
+        # Centrar elementos en la pantalla
+        self.label.setGeometry(0, self.height() // 2 - 50, self.width(), 100)
+        self.close_button.setGeometry(
+            self.width() // 2 - 50,
+            self.height() // 2 + 50,
+            100, 40
+        )
+
     def mousePressEvent(self, event):
-        # Registrar cuándo y dónde se presionó el mouse
         self.press_start_time = time.time()
         self.press_pos = event.pos()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        # Verificar si fue un clic prolongado
         if self.press_start_time > 0:
             duration = time.time() - self.press_start_time
-            # Verificar si el clic fue en la esquina inferior derecha
             if duration >= LONG_PRESS_DURATION and self.press_pos:
                 width = self.width()
                 height = self.height()
                 x, y = self.press_pos.x(), self.press_pos.y()
 
-                # Definir la zona de detección (20% inferior y derecha de la pantalla)
                 if x > width * 0.8 and y > height * 0.8:
                     self.close_button.setVisible(True)
 
