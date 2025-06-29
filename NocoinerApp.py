@@ -1,7 +1,9 @@
 import sys
 import requests
 import time
+import socket
 
+from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer
@@ -85,8 +87,38 @@ class BTCViewer(QWidget):
         # Label para mostrar el precio (encima de la imagen)
         self.label = QLabel("Cargando...", self)
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("color: white; font-size: 48px; font-weight: bold;")
+        self.label.setStyleSheet("color: white; font-size: 36px; font-weight: bold;")
         self.label.raise_()  # Elevar por encima del fondo
+
+        # Nuevo label para mostrar la IP
+        self.ip_label = QLabel("Obteniendo ip...", self)
+        self.ip_label.setAlignment(Qt.AlignCenter)
+        self.ip_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
+        self.ip_label.raise_()
+
+        # Nuevo label para mostrar la IP del minero
+        self.miner_ip_label = QLabel("Obteniendo ip del minero ...", self)
+        self.miner_ip_label.setAlignment(Qt.AlignCenter)
+        self.miner_ip_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
+        self.miner_ip_label.raise_()
+
+        # Label para hashrate
+        self.hashrate_label = QLabel("Hashrate: --", self)
+        self.hashrate_label.setAlignment(Qt.AlignCenter)
+        self.hashrate_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        self.hashrate_label.raise_()
+
+        # Label para temperatura
+        self.temp_label = QLabel("Temperatura: --", self)
+        self.temp_label.setAlignment(Qt.AlignCenter)
+        self.temp_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        self.temp_label.raise_()
+
+        # Label para pool
+        self.pool_label = QLabel("Pool: --", self)
+        self.pool_label.setAlignment(Qt.AlignCenter)
+        self.pool_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        self.pool_label.raise_()
 
         # Botón para cerrar (inicialmente oculto)
         self.close_button = QPushButton("Cerrar", self)
@@ -97,37 +129,60 @@ class BTCViewer(QWidget):
 
         # Temporizador para actualizar
         timer = QTimer(self)
-        timer.timeout.connect(self.update_price)
+        timer.timeout.connect(self.update_info)
         timer.start(UPDATE_INTERVAL_MS)
 
-        self.update_price()
+        self.update_info()
         self.showFullScreen()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
 
-        # Ajustar el fondo al tamaño completo de la ventana
+        # Ajustar el fondo
         self.background_label.setGeometry(0, 0, self.width(), self.height())
 
-        # Calcular el 50% del tamaño de la ventana
-        target_width = int(self.width() * 0.5)
-        target_height = int(self.height() * 0.5)
-
-        # Escalar la imagen al tamaño de la ventana sin mantener proporción para cubrir todo
+        # Escalar imagen
         scaled_pixmap = self.original_dark_pixmap.scaled(
             self.width(), self.height(),
             Qt.IgnoreAspectRatio, Qt.SmoothTransformation
         )
-
-        # Actualizar la imagen mostrada
         self.background_label.setPixmap(scaled_pixmap)
 
-        # Centrar elementos en la pantalla
-        self.label.setGeometry(0, self.height() // 2 - 50, self.width(), 100)
+        # Configuración para el centrado
+        label_height = 25
+        spacing = 10
+        num_labels = 6  # Precio, IP local, IP minero, hashrate, temp, pool
+
+        # Cálculo de la altura total del grupo de elementos
+        total_height = (label_height * num_labels) + (spacing * (num_labels - 1))
+
+        # Posición inicial para centrar verticalmente (restando altura del botón)
+        start_y = (self.height() - total_height) // 2 - 20
+
+        # Precio de Bitcoin (elemento principal, más grande)
+        self.label.setGeometry(0, start_y, self.width(), 40)
+        y_pos = start_y + 40 + spacing
+
+        # Resto de etiquetas
+        self.ip_label.setGeometry(0, y_pos, self.width(), label_height)
+        y_pos += label_height + spacing
+
+        self.miner_ip_label.setGeometry(0, y_pos, self.width(), label_height)
+        y_pos += label_height + spacing
+
+        self.hashrate_label.setGeometry(0, y_pos, self.width(), label_height)
+        y_pos += label_height + spacing
+
+        self.temp_label.setGeometry(0, y_pos, self.width(), label_height)
+        y_pos += label_height + spacing
+
+        self.pool_label.setGeometry(0, y_pos, self.width(), label_height)
+
+        # Botón de cerrar (en la parte inferior)
         self.close_button.setGeometry(
             self.width() // 2 - 50,
-            self.height() // 2 + 50,
-            100, 40
+            self.height() - 50,
+            100, 35
         )
 
     def mousePressEvent(self, event):
@@ -150,7 +205,18 @@ class BTCViewer(QWidget):
         self.press_pos = None
         super().mouseReleaseEvent(event)
 
-    def update_price(self):
+    '''def update_price(self):
+        try:
+            resp = requests.get(API_URL, timeout=3)
+            data = resp.json()
+            price = data[0]["price"]
+            self.label.setText(f"₿ {price:,.0f}")
+        except Exception as e:
+            self.label.setText("Error al obtener precio")
+            print("Fetch error:", e)'''
+
+    def update_info(self):
+        # Actualizar precio
         try:
             resp = requests.get(API_URL, timeout=3)
             data = resp.json()
@@ -160,6 +226,20 @@ class BTCViewer(QWidget):
             self.label.setText("Error al obtener precio")
             print("Fetch error:", e)
 
+        # Actualizar IP
+        self.ip_label.setText(f"IP: {self.get_local_ip()}")
+
+    # Añade esta función para obtener la IP local
+    def get_local_ip(self):
+        try:
+            # Conectar a un servidor externo para determinar la interfaz que usa internet
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "IP desconocida"
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
