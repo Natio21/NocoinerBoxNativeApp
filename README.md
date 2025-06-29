@@ -387,5 +387,3 @@ sudo reboot
 
 ---
 
-# Fin de la documentación
-
