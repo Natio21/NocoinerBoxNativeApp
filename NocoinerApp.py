@@ -11,7 +11,9 @@ from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QPushButton, QVBoxLay
 from PyQt5.QtCore import Qt, QTimer
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
-UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
+BTC_UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
+UPDATE_INTERVAL_MS = 1000  # refrescar cada 1 s
+SUMMARY_UPDATE_INTERVAL_MS = 1000  # refrescar summary cada 1 s
 LONG_PRESS_DURATION = 2  # segundos para considerar como pulsación larga
 
 
@@ -129,13 +131,21 @@ class BTCViewer(QWidget):
         self.close_button.setVisible(False)
         self.close_button.raise_()  # Elevar por encima del fondo
 
-        # Temporizador para actualizar
-        timer = QTimer(self)
-        timer.timeout.connect(self.update_info)
-        timer.start(UPDATE_INTERVAL_MS)
+        # Temporizador para actualizar precio de BTC
+        price_timer = QTimer(self)
+        price_timer.timeout.connect(self.update_btc_price)
+        price_timer.start(BTC_UPDATE_INTERVAL_MS)
 
-        self.update_info()
-        #self.showFullScreen()
+        # Temporizador para actualizar datos de summary
+        summary_timer = QTimer(self)
+        summary_timer.timeout.connect(self.update_summary)
+        summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
+
+        # Ejecutar una vez al inicio
+        self.update_btc_price()
+        self.update_summary()
+
+        self.showFullScreen()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -219,32 +229,41 @@ class BTCViewer(QWidget):
             print("Fetch error:", e)'''
 
     def update_info(self):
-        # Actualizar precio
+        # (Método antiguo, ya no se usa con temporizador)
+        pass
+
+    def update_btc_price(self):
+        """Fetch and display only the BTC price."""
         try:
             resp = requests.get(API_URL, timeout=3)
             data = resp.json()
             price = data[0]["price"]
             self.label.setText(f"₿ {price:,.0f}")
-
-            summary = self.get_summary_data()
-            miner = summary.get("miner", {})
-            instant_hashrate = miner.get("instant_hashrate", "--")
-            pcb_temp = miner.get("pcb_temp", {})
-            temp_max = pcb_temp.get("max", "--")
-            pools = miner.get("pools", [])
-            pool0_url = pools[0].get("url", "--") if pools else "--"
-
-            self.hashrate_label.setText(f"Hashrate: {instant_hashrate:.2f} TH")
-            self.temp_label.setText(f"Temp: {pcb_temp} ºC")
-            self.pool_label.setText(f"Pool: {pool0_url}")
-
-
         except Exception as e:
             self.label.setText("Error al obtener precio")
-            print("Fetch error:", e)
+            print("Fetch BTC price error:", e)
 
-        # Actualizar IP
-        self.ip_label.setText(f"IP: {self.get_local_ip()}")
+    def update_summary(self):
+        """Fetch and display only the miner summary info."""
+        summary = self.get_summary_data()
+        miner = summary.get("miner", {})
+        instant_hashrate = miner.get("instant_hashrate", "--")
+        pcb_temp = miner.get("pcb_temp", {})
+        temp_max = pcb_temp.get("max", "--")
+        pools = miner.get("pools", [])
+        pool0_url = pools[0].get("url", "--") if pools else "--"
+
+        # Formatear hashrate a dos decimales
+        if isinstance(instant_hashrate, (int, float)):
+            formatted_hashrate = f"{instant_hashrate:.2f}"
+        else:
+            formatted_hashrate = instant_hashrate
+
+        self.hashrate_label.setText(f"Hashrate: {formatted_hashrate} TH/s")
+        self.temp_label.setText(f"Temperatura PCB: {temp_max} °C")
+        self.pool_label.setText(f"Pool: {pool0_url}")
+
+        # Actualizar IP del minero
         self.config_natio_box_ip_label.setText(f"Config: {self.get_local_ip()}:8000")
 
     # Añade esta función para obtener la IP local
