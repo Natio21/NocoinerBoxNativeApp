@@ -91,7 +91,7 @@ class BTCViewer(QWidget):
         # Label para mostrar el precio (encima de la imagen)
         self.label = QLabel("Cargando...", self)
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("color: white; font-size: 36px; font-weight: bold;")
+        self.label.setStyleSheet("color: white; font-size: 26px; font-weight: bold;")
         self.label.raise_()  # Elevar por encima del fondo
 
         # Nuevo label para mostrar la IP
@@ -103,13 +103,13 @@ class BTCViewer(QWidget):
         # Nuevo label para mostrar la IP del minero
         self.config_natio_box_ip_label = QLabel("Obteniendo ip del minero ...", self)
         self.config_natio_box_ip_label.setAlignment(Qt.AlignCenter)
-        self.config_natio_box_ip_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
+        self.config_natio_box_ip_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
         self.config_natio_box_ip_label.raise_()
 
         # Label para hashrate
         self.hashrate_label = QLabel("Hashrate: --", self)
         self.hashrate_label.setAlignment(Qt.AlignCenter)
-        self.hashrate_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        self.hashrate_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
         self.hashrate_label.raise_()
 
         # Label para temperatura
@@ -264,6 +264,7 @@ class BTCViewer(QWidget):
         self.pool_label.setText(f"Pool: {pool0_url}")
 
         # Actualizar IP del minero
+        self.ip_label.setText(f"Config: {self.get_local_ip()}")
         self.config_natio_box_ip_label.setText(f"Config: {self.get_local_ip()}:8000")
 
     # Añade esta función para obtener la IP local
