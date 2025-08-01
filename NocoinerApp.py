@@ -1,4 +1,6 @@
 import sys
+from logging import Logger
+
 import requests
 import time
 import socket
@@ -97,10 +99,10 @@ class BTCViewer(QWidget):
         self.ip_label.raise_()
 
         # Nuevo label para mostrar la IP del minero
-        self.miner_ip_label = QLabel("Obteniendo ip del minero ...", self)
-        self.miner_ip_label.setAlignment(Qt.AlignCenter)
-        self.miner_ip_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
-        self.miner_ip_label.raise_()
+        self.config_natio_box_ip_label = QLabel("Obteniendo ip del minero ...", self)
+        self.config_natio_box_ip_label.setAlignment(Qt.AlignCenter)
+        self.config_natio_box_ip_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
+        self.config_natio_box_ip_label.raise_()
 
         # Label para hashrate
         self.hashrate_label = QLabel("Hashrate: --", self)
@@ -133,7 +135,7 @@ class BTCViewer(QWidget):
         timer.start(UPDATE_INTERVAL_MS)
 
         self.update_info()
-        self.showFullScreen()
+        #self.showFullScreen()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -163,11 +165,12 @@ class BTCViewer(QWidget):
         self.label.setGeometry(0, start_y, self.width(), 40)
         y_pos = start_y + 40 + spacing
 
+
         # Resto de etiquetas
         self.ip_label.setGeometry(0, y_pos, self.width(), label_height)
         y_pos += label_height + spacing
 
-        self.miner_ip_label.setGeometry(0, y_pos, self.width(), label_height)
+        self.config_natio_box_ip_label.setGeometry(0, y_pos, self.width(), label_height)
         y_pos += label_height + spacing
 
         self.hashrate_label.setGeometry(0, y_pos, self.width(), label_height)
@@ -222,12 +225,27 @@ class BTCViewer(QWidget):
             data = resp.json()
             price = data[0]["price"]
             self.label.setText(f"₿ {price:,.0f}")
+
+            summary = self.get_summary_data()
+            miner = summary.get("miner", {})
+            instant_hashrate = miner.get("instant_hashrate", "--")
+            pcb_temp = miner.get("pcb_temp", {})
+            temp_max = pcb_temp.get("max", "--")
+            pools = miner.get("pools", [])
+            pool0_url = pools[0].get("url", "--") if pools else "--"
+
+            self.hashrate_label.setText(f"Hashrate: {instant_hashrate:.2f} TH")
+            self.temp_label.setText(f"Temp: {pcb_temp} ºC")
+            self.pool_label.setText(f"Pool: {pool0_url}")
+
+
         except Exception as e:
             self.label.setText("Error al obtener precio")
             print("Fetch error:", e)
 
         # Actualizar IP
         self.ip_label.setText(f"IP: {self.get_local_ip()}")
+        self.config_natio_box_ip_label.setText(f"Config: {self.get_local_ip()}:8000")
 
     # Añade esta función para obtener la IP local
     def get_local_ip(self):
@@ -240,6 +258,18 @@ class BTCViewer(QWidget):
             return ip
         except Exception:
             return "IP desconocida"
+
+    def get_summary_data(self) -> dict:
+        """Fetch all summary data from the miner and return as a dict."""
+        try:
+            resp = requests.get("http://192.168.220.3/api/v1/summary", timeout=3)
+            return resp.json()
+        except Exception as e:
+            print(f"Fetch summary error: {e}")
+            return {}
+
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
