@@ -7,7 +7,17 @@ import socket
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
-from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QApplication,
+    QLabel,
+    QWidget,
+    QPushButton,
+    QVBoxLayout,
+    QDialog,
+    QLineEdit,
+    QFormLayout,
+    QDialogButtonBox,
+)
 from PyQt5.QtCore import Qt, QTimer
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
@@ -22,6 +32,10 @@ class BTCViewer(QWidget):
         super().__init__()
         # Configuración ventana
         self.setWindowTitle("BTC Price")
+
+        # Credenciales de WiFi configurables
+        self.ssid = ""
+        self.password = ""
 
         # Variables para el clic prolongado
         self.press_start_time = 0
@@ -124,6 +138,14 @@ class BTCViewer(QWidget):
         self.pool_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
         self.pool_label.raise_()
 
+        # Botón de configuración (siempre visible en la esquina superior derecha)
+        self.settings_button = QPushButton("Config", self)
+        self.settings_button.setStyleSheet(
+            "background-color: #444; color: white; font-size: 14px; padding: 6px;"
+        )
+        self.settings_button.clicked.connect(self.open_config_dialog)
+        self.settings_button.raise_()
+
         # Botón para cerrar (inicialmente oculto)
         self.close_button = QPushButton("Cerrar", self)
         self.close_button.setStyleSheet("background-color: #333; color: white; font-size: 16px; padding: 8px;")
@@ -191,12 +213,26 @@ class BTCViewer(QWidget):
 
         self.pool_label.setGeometry(0, y_pos, self.width(), label_height)
 
+        # Botón de configuración (esquina superior derecha)
+        self.settings_button.setGeometry(
+            self.width() - 110,
+            10,
+            100,
+            35,
+        )
+
         # Botón de cerrar (en la parte inferior)
         self.close_button.setGeometry(
             self.width() // 2 - 50,
             self.height() - 50,
             100, 35
         )
+
+    def open_config_dialog(self):
+        dialog = ConfigDialog(self.ssid, self.password, self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.ssid, self.password = dialog.get_credentials()
+
 
     def mousePressEvent(self, event):
         self.press_start_time = time.time()
@@ -290,6 +326,30 @@ class BTCViewer(QWidget):
             return {}
 
 
+class ConfigDialog(QDialog):
+    def __init__(self, current_ssid: str, current_password: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Configurar WiFi")
+
+        self.ssid_edit = QLineEdit(current_ssid)
+        self.password_edit = QLineEdit(current_password)
+        self.password_edit.setEchoMode(QLineEdit.Password)
+
+        form_layout = QFormLayout()
+        form_layout.addRow("SSID:", self.ssid_edit)
+        form_layout.addRow("Password:", self.password_edit)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form_layout)
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+    def get_credentials(self):
+        return self.ssid_edit.text(), self.password_edit.text()
 
 
 if __name__ == "__main__":
@@ -297,3 +357,4 @@ if __name__ == "__main__":
     viewer = BTCViewer()
     viewer.show()
     sys.exit(app.exec_())
+
