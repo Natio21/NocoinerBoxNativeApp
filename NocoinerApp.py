@@ -282,6 +282,7 @@ class BTCViewer(QWidget):
     def get_summary_data(self) -> dict:
         """Fetch all summary data from the miner and return as a dict."""
         try:
+            #resp = requests.get("http://192.168.1.62/api/v1/summary", timeout=3)
             resp = requests.get("http://192.168.220.3/api/v1/summary", timeout=3)
             return resp.json()
         except Exception as e:
