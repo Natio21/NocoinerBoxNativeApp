@@ -4,6 +4,8 @@ from logging import Logger
 import requests
 import time
 import socket
+import subprocess
+import shutil
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
@@ -230,8 +232,38 @@ class BTCViewer(QWidget):
 
     def open_config_dialog(self):
         dialog = ConfigDialog(self.ssid, self.password, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.ssid, self.password = dialog.get_credentials()
+        keyboard_process = self.launch_onboard_keyboard()
+        try:
+            if dialog.exec_() == QDialog.Accepted:
+                self.ssid, self.password = dialog.get_credentials()
+        finally:
+            self.close_onboard_keyboard(keyboard_process)
+
+    def launch_onboard_keyboard(self):
+        if shutil.which("onboard") is None:
+            print("Onboard keyboard not found on system.")
+            return None
+
+        try:
+            return subprocess.Popen(["onboard"])
+        except Exception as exc:
+            print(f"Unable to launch onboard keyboard: {exc}")
+            return None
+
+    def close_onboard_keyboard(self, process):
+        if process is None:
+            return
+
+        if process.poll() is not None:
+            return
+
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        except Exception as exc:
+            print(f"Unable to close onboard keyboard: {exc}")
 
 
     def mousePressEvent(self, event):
