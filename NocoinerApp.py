@@ -359,8 +359,8 @@ class ConfigDialog(QDialog):
         self.cancel_button = QPushButton("Cancelar")
         self.connect_button.clicked.connect(self._handle_connect)
         self.cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(self.connect_button)
         buttons_layout.addWidget(self.cancel_button)
+        buttons_layout.addWidget(self.connect_button)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(40, 40, 40, 40)
