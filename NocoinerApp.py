@@ -555,6 +555,12 @@ class OnScreenKeyboard(QWidget):
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
+        keys_container = QHBoxLayout()
+        keys_container.setSpacing(4)
+
+        letter_rows_layout = QVBoxLayout()
+        letter_rows_layout.setSpacing(4)
+
         rows = [
             [("1", "!"), ("2", "@"), ("3", "#"), ("4", "$"), ("5", "%"), ("6", "^"), ("7", "&"), ("8", "*"), ("9", "("), ("0", ")")],
             [("q", "Q"), ("w", "W"), ("e", "E"), ("r", "R"), ("t", "T"), ("y", "Y"), ("u", "U"), ("i", "I"), ("o", "O"), ("p", "P")],
@@ -568,7 +574,7 @@ class OnScreenKeyboard(QWidget):
             for char, shift_char in row_chars:
                 button = self._create_char_button(char, shift_char)
                 row_layout.addWidget(button)
-            main_layout.addLayout(row_layout)
+            letter_rows_layout.addLayout(row_layout)
 
         symbols_row = [
             ("-", "_"),
@@ -587,12 +593,17 @@ class OnScreenKeyboard(QWidget):
             ("\\", "|"),
         ]
 
-        symbols_layout = QHBoxLayout()
+        symbols_layout = QVBoxLayout()
         symbols_layout.setSpacing(4)
         for char, shift_char in symbols_row:
             button = self._create_char_button(char, shift_char)
             symbols_layout.addWidget(button)
-        main_layout.addLayout(symbols_layout)
+        symbols_layout.addStretch(1)
+
+        keys_container.addLayout(letter_rows_layout)
+        keys_container.addLayout(symbols_layout)
+
+        main_layout.addLayout(keys_container)
 
         control_layout = QHBoxLayout()
         control_layout.setSpacing(4)
