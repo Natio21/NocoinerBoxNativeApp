@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QCheckBox,
     QMessageBox,
+    QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QTimer, QEvent
 
@@ -341,47 +342,60 @@ class ConfigDialog(QDialog):
         self.selected_ssid = current_ssid
 
         self.ssid_list = QListWidget()
+        self.ssid_list.setSpacing(2)
+        self.ssid_list.setFixedHeight(150)
         self.ssid_list.itemSelectionChanged.connect(self._handle_ssid_selection)
 
         self.ssid_edit = QLineEdit(current_ssid)
+        self.ssid_edit.setStyleSheet("font-size: 16px; padding: 6px;")
         self.password_edit = QLineEdit(current_password)
+        self.password_edit.setStyleSheet("font-size: 16px; padding: 6px;")
         self.password_edit.setEchoMode(QLineEdit.Password)
         self.password_edit.installEventFilter(self)
 
         self.show_password_checkbox = QCheckBox("Mostrar contraseña")
+        self.show_password_checkbox.setStyleSheet("font-size: 14px;")
         self.show_password_checkbox.stateChanged.connect(self._toggle_password_visibility)
 
         form_layout = QFormLayout()
+        form_layout.setSpacing(6)
         form_layout.addRow("SSID manual:", self.ssid_edit)
         form_layout.addRow("Password:", self.password_edit)
         form_layout.addRow("", self.show_password_checkbox)
 
         self.keyboard = OnScreenKeyboard(self.password_edit, self)
         self.keyboard.setVisible(False)
+        self.keyboard.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
         self.toggle_keyboard_button = QPushButton("Mostrar teclado")
+        self.toggle_keyboard_button.setStyleSheet("font-size: 14px; padding: 6px 10px;")
         self.toggle_keyboard_button.clicked.connect(self._toggle_keyboard_visibility)
 
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(12)
         self.connect_button = QPushButton("Conectar")
         self.cancel_button = QPushButton("Cancelar")
+        for btn in (self.cancel_button, self.connect_button):
+            btn.setStyleSheet("font-size: 15px; padding: 8px 14px;")
         self.connect_button.clicked.connect(self._handle_connect)
         self.cancel_button.clicked.connect(self.reject)
+        buttons_layout.addStretch(1)
         buttons_layout.addWidget(self.cancel_button)
         buttons_layout.addWidget(self.connect_button)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(20)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        layout.addLayout(buttons_layout)
 
         title_label = QLabel("Selecciona una red WiFi visible:")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
         layout.addWidget(title_label)
         layout.addWidget(self.ssid_list)
         layout.addLayout(form_layout)
         layout.addWidget(self.toggle_keyboard_button)
         layout.addWidget(self.keyboard)
-        layout.addLayout(buttons_layout)
         self.setLayout(layout)
 
         self._load_wifi_networks()
@@ -474,12 +488,12 @@ class OnScreenKeyboard(QWidget):
         self.char_buttons = []
 
         self.setStyleSheet(
-            "QPushButton { background-color: #222; color: white; padding: 12px; font-size: 18px; border-radius: 4px; }"
+            "QPushButton { background-color: #222; color: white; padding: 8px; font-size: 16px; border-radius: 4px; }"
             "QPushButton:pressed { background-color: #444; }"
         )
 
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(10)
+        main_layout.setSpacing(6)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         rows = [
@@ -491,14 +505,14 @@ class OnScreenKeyboard(QWidget):
 
         for row_chars in rows:
             row_layout = QHBoxLayout()
-            row_layout.setSpacing(10)
+            row_layout.setSpacing(6)
             for char in row_chars:
                 button = self._create_char_button(char)
                 row_layout.addWidget(button)
             main_layout.addLayout(row_layout)
 
         control_layout = QHBoxLayout()
-        control_layout.setSpacing(10)
+        control_layout.setSpacing(6)
 
         self.shift_button = QPushButton("Mayús")
         self.shift_button.setCheckable(True)
