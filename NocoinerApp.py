@@ -160,14 +160,14 @@ class BTCViewer(QWidget):
         self.close_button.raise_()  # Elevar por encima del fondo
 
         # Temporizador para actualizar precio de BTC
-        price_timer = QTimer(self)
-        price_timer.timeout.connect(self.update_btc_price)
-        price_timer.start(BTC_UPDATE_INTERVAL_MS)
+        self.price_timer = QTimer(self)
+        self.price_timer.timeout.connect(self.update_btc_price)
+        self.price_timer.start(BTC_UPDATE_INTERVAL_MS)
 
         # Temporizador para actualizar datos de summary
-        summary_timer = QTimer(self)
-        summary_timer.timeout.connect(self.update_summary)
-        summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
+        self.summary_timer = QTimer(self)
+        self.summary_timer.timeout.connect(self.update_summary)
+        self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
 
         # Ejecutar una vez al inicio
         self.update_btc_price()
@@ -235,9 +235,28 @@ class BTCViewer(QWidget):
         )
 
     def open_config_dialog(self):
+        self.pause_updates()
         dialog = ConfigDialog(self.ssid, self.password, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.ssid, self.password = dialog.get_credentials()
+        try:
+            if dialog.exec_() == QDialog.Accepted:
+                self.ssid, self.password = dialog.get_credentials()
+        finally:
+            self.resume_updates()
+            # Refrescar información tras reanudar
+            self.update_btc_price()
+            self.update_summary()
+
+    def pause_updates(self):
+        if hasattr(self, "price_timer") and self.price_timer.isActive():
+            self.price_timer.stop()
+        if hasattr(self, "summary_timer") and self.summary_timer.isActive():
+            self.summary_timer.stop()
+
+    def resume_updates(self):
+        if hasattr(self, "price_timer") and not self.price_timer.isActive():
+            self.price_timer.start(BTC_UPDATE_INTERVAL_MS)
+        if hasattr(self, "summary_timer") and not self.summary_timer.isActive():
+            self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
 
 
     def mousePressEvent(self, event):
