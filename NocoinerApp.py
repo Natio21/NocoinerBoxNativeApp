@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QWidget,
     QPushButton,
     QVBoxLayout,
+    QGridLayout,
     QDialog,
     QLineEdit,
     QFormLayout,
@@ -593,15 +594,22 @@ class OnScreenKeyboard(QWidget):
             ("\\", "|"),
         ]
 
-        symbols_layout = QVBoxLayout()
+        symbols_layout = QGridLayout()
         symbols_layout.setSpacing(4)
-        for char, shift_char in symbols_row:
+        symbols_columns = 3
+        for index, (char, shift_char) in enumerate(symbols_row):
+            row = index // symbols_columns
+            column = index % symbols_columns
             button = self._create_char_button(char, shift_char)
-            symbols_layout.addWidget(button)
-        symbols_layout.addStretch(1)
+            symbols_layout.addWidget(button, row, column)
+
+        symbols_container = QVBoxLayout()
+        symbols_container.setSpacing(4)
+        symbols_container.addLayout(symbols_layout)
+        symbols_container.addStretch(1)
 
         keys_container.addLayout(letter_rows_layout)
-        keys_container.addLayout(symbols_layout)
+        keys_container.addLayout(symbols_container)
 
         main_layout.addLayout(keys_container)
 
