@@ -165,9 +165,9 @@ class BTCViewer(QWidget):
         price_timer.start(BTC_UPDATE_INTERVAL_MS)
 
         # Temporizador para actualizar datos de summary
-        summary_timer = QTimer(self)
-        summary_timer.timeout.connect(self.update_summary)
-        summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
+        self.summary_timer = QTimer(self)
+        self.summary_timer.timeout.connect(self.update_summary)
+        self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
 
         # Ejecutar una vez al inicio
         self.update_btc_price()
@@ -235,8 +235,18 @@ class BTCViewer(QWidget):
         )
 
     def open_config_dialog(self):
+        summary_timer_was_running = False
+        if hasattr(self, "summary_timer"):
+            summary_timer_was_running = self.summary_timer.isActive()
+            self.summary_timer.stop()
+
         dialog = ConfigDialog(self.ssid, self.password, self)
-        if dialog.exec_() == QDialog.Accepted:
+        result = dialog.exec_()
+
+        if hasattr(self, "summary_timer") and summary_timer_was_running:
+            self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
+
+        if result == QDialog.Accepted:
             self.ssid, self.password = dialog.get_credentials()
 
 
