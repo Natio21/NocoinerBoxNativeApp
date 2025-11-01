@@ -347,7 +347,7 @@ class ConfigDialog(QDialog):
         self.ssid_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.ssid_scroll.setWidgetResizable(True)
         self.ssid_scroll.setFixedHeight(58)
-        self.ssid_scroll.setFixedWidth(260)
+        self.ssid_scroll.setMaximumWidth(280)
         self.ssid_scroll.setStyleSheet("QScrollArea { background-color: #1a1a1a; border: 1px solid #222; }")
 
         self.ssid_container = QWidget()
@@ -371,20 +371,28 @@ class ConfigDialog(QDialog):
         self.show_password_checkbox.setStyleSheet("font-size: 12px;")
         self.show_password_checkbox.stateChanged.connect(self._toggle_password_visibility)
 
+        password_row_widget = QWidget()
+        password_row_layout = QHBoxLayout(password_row_widget)
+        password_row_layout.setContentsMargins(0, 0, 0, 0)
+        password_row_layout.setSpacing(6)
+        password_row_layout.addWidget(self.password_edit)
+        password_row_layout.addWidget(self.show_password_checkbox)
+
         form_layout = QFormLayout()
         form_layout.setSpacing(4)
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.addRow("SSID manual:", self.ssid_edit)
-        form_layout.addRow("Password:", self.password_edit)
-        form_layout.addRow("", self.show_password_checkbox)
+        form_layout.addRow("Password:", password_row_widget)
 
         self.keyboard = OnScreenKeyboard(self.password_edit, self)
         self.keyboard.setVisible(False)
-        self.keyboard.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.keyboard.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.keyboard.setMinimumWidth(320)
 
         self.toggle_keyboard_button = QPushButton("Mostrar teclado")
         self.toggle_keyboard_button.setStyleSheet("font-size: 12px; padding: 4px 8px;")
         self.toggle_keyboard_button.clicked.connect(self._toggle_keyboard_visibility)
+        self.toggle_keyboard_button.setFixedHeight(58)
 
         self.connect_button = QPushButton("Conectar")
         self.cancel_button = QPushButton("Cancelar")
@@ -409,11 +417,16 @@ class ConfigDialog(QDialog):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
 
+        ssid_controls_layout = QHBoxLayout()
+        ssid_controls_layout.setContentsMargins(0, 0, 0, 0)
+        ssid_controls_layout.setSpacing(6)
+        ssid_controls_layout.addWidget(self.ssid_scroll)
+        ssid_controls_layout.addWidget(self.toggle_keyboard_button)
+
         layout.addLayout(header_layout)
-        layout.addWidget(self.ssid_scroll, alignment=Qt.AlignCenter)
+        layout.addLayout(ssid_controls_layout)
         layout.addLayout(form_layout)
-        layout.addWidget(self.toggle_keyboard_button)
-        layout.addWidget(self.keyboard)
+        layout.addWidget(self.keyboard, 0, Qt.AlignCenter)
         layout.addStretch(1)
         self.setLayout(layout)
 
