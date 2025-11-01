@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QWidget,
     QPushButton,
     QVBoxLayout,
+    QGridLayout,
     QDialog,
     QLineEdit,
     QFormLayout,
@@ -574,25 +575,67 @@ class OnScreenKeyboard(QWidget):
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
+        keys_container = QHBoxLayout()
+        keys_container.setSpacing(4)
+
+        letter_rows_layout = QVBoxLayout()
+        letter_rows_layout.setSpacing(4)
+
         rows = [
-            "1234567890",
-            "qwertyuiop",
-            "asdfghjkl",
-            "zxcvbnm",
+            [("1", "!"), ("2", "@"), ("3", "#"), ("4", "$"), ("5", "%"), ("6", "^"), ("7", "&"), ("8", "*"), ("9", "("), ("0", ")")],
+            [("q", "Q"), ("w", "W"), ("e", "E"), ("r", "R"), ("t", "T"), ("y", "Y"), ("u", "U"), ("i", "I"), ("o", "O"), ("p", "P")],
+            [("a", "A"), ("s", "S"), ("d", "D"), ("f", "F"), ("g", "G"), ("h", "H"), ("j", "J"), ("k", "K"), ("l", "L"), ("ñ", "Ñ")],
+            [("z", "Z"), ("x", "X"), ("c", "C"), ("v", "V"), ("b", "B"), ("n", "N"), ("m", "M")],
         ]
 
         for row_chars in rows:
             row_layout = QHBoxLayout()
             row_layout.setSpacing(4)
-            for char in row_chars:
-                button = self._create_char_button(char)
+            for char, shift_char in row_chars:
+                button = self._create_char_button(char, shift_char)
                 row_layout.addWidget(button)
-            main_layout.addLayout(row_layout)
+            letter_rows_layout.addLayout(row_layout)
+
+        symbols_row = [
+            ("-", "_"),
+            ("=", "+"),
+            ("@", "@"),
+            ("#", "#"),
+            ("$", "$"),
+            ("%", "%"),
+            ("&", "&"),
+            ("*", "*"),
+            (".", ">"),
+            (",", "<"),
+            (";", ":"),
+            ("'", '"'),
+            ("/", "?"),
+            ("\\", "|"),
+        ]
+
+        symbols_layout = QGridLayout()
+        symbols_layout.setSpacing(4)
+        symbols_columns = 3
+        for index, (char, shift_char) in enumerate(symbols_row):
+            row = index // symbols_columns
+            column = index % symbols_columns
+            button = self._create_char_button(char, shift_char)
+            symbols_layout.addWidget(button, row, column)
+
+        symbols_container = QVBoxLayout()
+        symbols_container.setSpacing(4)
+        symbols_container.addLayout(symbols_layout)
+        symbols_container.addStretch(1)
+
+        keys_container.addLayout(letter_rows_layout)
+        keys_container.addLayout(symbols_container)
+
+        main_layout.addLayout(keys_container)
 
         control_layout = QHBoxLayout()
         control_layout.setSpacing(4)
 
-        self.shift_button = QPushButton("Mayús")
+        self.shift_button = QPushButton("Shift")
         self.shift_button.setCheckable(True)
         self.shift_button.toggled.connect(self._toggle_shift)
         control_layout.addWidget(self.shift_button)
@@ -611,21 +654,21 @@ class OnScreenKeyboard(QWidget):
 
         main_layout.addLayout(control_layout)
 
-    def _create_char_button(self, char: str) -> QPushButton:
+    def _create_char_button(self, char: str, shift_char: str = None) -> QPushButton:
         button = QPushButton(char)
-        button.setProperty("char", char)
+        button.setProperty("char_lower", char)
+        button.setProperty("char_upper", shift_char if shift_char is not None else char.upper())
         button.clicked.connect(partial(self._handle_char_button, button))
         self.char_buttons.append(button)
         return button
 
     def _handle_char_button(self, button: QPushButton):
-        char = button.property("char")
-        if not char:
+        lower_char = button.property("char_lower")
+        upper_char = button.property("char_upper")
+        if not lower_char:
             return
-        if self.shift_enabled:
-            self.target_input.insert(char.upper())
-        else:
-            self.target_input.insert(char)
+        char_to_insert = upper_char if self.shift_enabled and upper_char else lower_char
+        self.target_input.insert(char_to_insert)
 
     def _toggle_shift(self, checked: bool):
         self.shift_enabled = checked
@@ -633,9 +676,13 @@ class OnScreenKeyboard(QWidget):
 
     def _update_char_buttons(self):
         for button in self.char_buttons:
-            char = button.property("char")
-            if char:
-                button.setText(char.upper() if self.shift_enabled else char.lower())
+            lower_char = button.property("char_lower")
+            upper_char = button.property("char_upper")
+            if lower_char:
+                if self.shift_enabled and upper_char:
+                    button.setText(upper_char)
+                else:
+                    button.setText(lower_char)
 
     def reset(self):
         if self.shift_button.isChecked():
