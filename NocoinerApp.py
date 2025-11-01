@@ -4,6 +4,7 @@ from logging import Logger
 import requests
 import time
 import socket
+from functools import partial
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
@@ -21,7 +22,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QMessageBox,
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QEvent
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
 BTC_UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
@@ -345,6 +346,7 @@ class ConfigDialog(QDialog):
         self.ssid_edit = QLineEdit(current_ssid)
         self.password_edit = QLineEdit(current_password)
         self.password_edit.setEchoMode(QLineEdit.Password)
+        self.password_edit.installEventFilter(self)
 
         self.show_password_checkbox = QCheckBox("Mostrar contraseña")
         self.show_password_checkbox.stateChanged.connect(self._toggle_password_visibility)
@@ -353,6 +355,12 @@ class ConfigDialog(QDialog):
         form_layout.addRow("SSID manual:", self.ssid_edit)
         form_layout.addRow("Password:", self.password_edit)
         form_layout.addRow("", self.show_password_checkbox)
+
+        self.keyboard = OnScreenKeyboard(self.password_edit, self)
+        self.keyboard.setVisible(False)
+
+        self.toggle_keyboard_button = QPushButton("Mostrar teclado")
+        self.toggle_keyboard_button.clicked.connect(self._toggle_keyboard_visibility)
 
         buttons_layout = QHBoxLayout()
         self.connect_button = QPushButton("Conectar")
@@ -371,6 +379,8 @@ class ConfigDialog(QDialog):
         layout.addWidget(title_label)
         layout.addWidget(self.ssid_list)
         layout.addLayout(form_layout)
+        layout.addWidget(self.toggle_keyboard_button)
+        layout.addWidget(self.keyboard)
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
 
@@ -405,6 +415,26 @@ class ConfigDialog(QDialog):
             self.ssid_list.addItem("No se encontraron redes WiFi visibles")
             self.ssid_list.setEnabled(False)
 
+    def eventFilter(self, obj, event):
+        if obj is self.password_edit and event.type() in (QEvent.FocusIn, QEvent.MouseButtonPress):
+            self._show_keyboard()
+        return super().eventFilter(obj, event)
+
+    def _toggle_keyboard_visibility(self):
+        if self.keyboard.isVisible():
+            self._hide_keyboard()
+        else:
+            self._show_keyboard()
+
+    def _show_keyboard(self):
+        self.keyboard.setVisible(True)
+        self.toggle_keyboard_button.setText("Ocultar teclado")
+
+    def _hide_keyboard(self):
+        self.keyboard.setVisible(False)
+        self.toggle_keyboard_button.setText("Mostrar teclado")
+        self.keyboard.reset()
+
     @staticmethod
     def _scan_wifi_networks():
         try:
@@ -434,6 +464,92 @@ class ConfigDialog(QDialog):
 
     def get_credentials(self):
         return self.ssid_edit.text(), self.password_edit.text()
+
+
+class OnScreenKeyboard(QWidget):
+    def __init__(self, target_input: QLineEdit, parent=None):
+        super().__init__(parent)
+        self.target_input = target_input
+        self.shift_enabled = False
+        self.char_buttons = []
+
+        self.setStyleSheet(
+            "QPushButton { background-color: #222; color: white; padding: 12px; font-size: 18px; border-radius: 4px; }"
+            "QPushButton:pressed { background-color: #444; }"
+        )
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        rows = [
+            "1234567890",
+            "qwertyuiop",
+            "asdfghjkl",
+            "zxcvbnm",
+        ]
+
+        for row_chars in rows:
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(10)
+            for char in row_chars:
+                button = self._create_char_button(char)
+                row_layout.addWidget(button)
+            main_layout.addLayout(row_layout)
+
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(10)
+
+        self.shift_button = QPushButton("Mayús")
+        self.shift_button.setCheckable(True)
+        self.shift_button.toggled.connect(self._toggle_shift)
+        control_layout.addWidget(self.shift_button)
+
+        space_button = QPushButton("Espacio")
+        space_button.clicked.connect(lambda: self.target_input.insert(" "))
+        control_layout.addWidget(space_button)
+
+        backspace_button = QPushButton("Borrar")
+        backspace_button.clicked.connect(self.target_input.backspace)
+        control_layout.addWidget(backspace_button)
+
+        clear_button = QPushButton("Limpiar")
+        clear_button.clicked.connect(self.target_input.clear)
+        control_layout.addWidget(clear_button)
+
+        main_layout.addLayout(control_layout)
+
+    def _create_char_button(self, char: str) -> QPushButton:
+        button = QPushButton(char)
+        button.setProperty("char", char)
+        button.clicked.connect(partial(self._handle_char_button, button))
+        self.char_buttons.append(button)
+        return button
+
+    def _handle_char_button(self, button: QPushButton):
+        char = button.property("char")
+        if not char:
+            return
+        if self.shift_enabled:
+            self.target_input.insert(char.upper())
+        else:
+            self.target_input.insert(char)
+
+    def _toggle_shift(self, checked: bool):
+        self.shift_enabled = checked
+        self._update_char_buttons()
+
+    def _update_char_buttons(self):
+        for button in self.char_buttons:
+            char = button.property("char")
+            if char:
+                button.setText(char.upper() if self.shift_enabled else char.lower())
+
+    def reset(self):
+        if self.shift_button.isChecked():
+            self.shift_button.setChecked(False)
+        else:
+            self._toggle_shift(False)
 
 
 if __name__ == "__main__":
