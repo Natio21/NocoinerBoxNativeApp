@@ -16,7 +16,10 @@ from PyQt5.QtWidgets import (
     QDialog,
     QLineEdit,
     QFormLayout,
-    QDialogButtonBox,
+    QListWidget,
+    QHBoxLayout,
+    QCheckBox,
+    QMessageBox,
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -330,23 +333,104 @@ class ConfigDialog(QDialog):
     def __init__(self, current_ssid: str, current_password: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configurar WiFi")
+        self.setWindowFlag(Qt.FramelessWindowHint)
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #111; color: white;")
+
+        self.selected_ssid = current_ssid
+
+        self.ssid_list = QListWidget()
+        self.ssid_list.itemSelectionChanged.connect(self._handle_ssid_selection)
 
         self.ssid_edit = QLineEdit(current_ssid)
         self.password_edit = QLineEdit(current_password)
         self.password_edit.setEchoMode(QLineEdit.Password)
 
-        form_layout = QFormLayout()
-        form_layout.addRow("SSID:", self.ssid_edit)
-        form_layout.addRow("Password:", self.password_edit)
+        self.show_password_checkbox = QCheckBox("Mostrar contraseña")
+        self.show_password_checkbox.stateChanged.connect(self._toggle_password_visibility)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        form_layout = QFormLayout()
+        form_layout.addRow("SSID manual:", self.ssid_edit)
+        form_layout.addRow("Password:", self.password_edit)
+        form_layout.addRow("", self.show_password_checkbox)
+
+        buttons_layout = QHBoxLayout()
+        self.connect_button = QPushButton("Conectar")
+        self.cancel_button = QPushButton("Cancelar")
+        self.connect_button.clicked.connect(self._handle_connect)
+        self.cancel_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(self.cancel_button)
+        buttons_layout.addWidget(self.connect_button)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(20)
+
+        title_label = QLabel("Selecciona una red WiFi visible:")
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        layout.addWidget(title_label)
+        layout.addWidget(self.ssid_list)
         layout.addLayout(form_layout)
-        layout.addWidget(buttons)
+        layout.addLayout(buttons_layout)
         self.setLayout(layout)
+
+        self._load_wifi_networks()
+
+    def _handle_ssid_selection(self):
+        selected_items = self.ssid_list.selectedItems()
+        if selected_items:
+            self.selected_ssid = selected_items[0].text()
+            self.ssid_edit.setText(self.selected_ssid)
+
+    def _toggle_password_visibility(self, state):
+        if state == Qt.Checked:
+            self.password_edit.setEchoMode(QLineEdit.Normal)
+        else:
+            self.password_edit.setEchoMode(QLineEdit.Password)
+
+    def _handle_connect(self):
+        if not self.ssid_edit.text():
+            QMessageBox.warning(self, "SSID requerido", "Selecciona o introduce un SSID para continuar.")
+            return
+        self.accept()
+
+    def _load_wifi_networks(self):
+        networks = self._scan_wifi_networks()
+        if networks:
+            self.ssid_list.addItems(networks)
+            matching_items = self.ssid_list.findItems(self.selected_ssid, Qt.MatchExactly)
+            if matching_items:
+                matching_items[0].setSelected(True)
+        else:
+            self.ssid_list.addItem("No se encontraron redes WiFi visibles")
+            self.ssid_list.setEnabled(False)
+
+    @staticmethod
+    def _scan_wifi_networks():
+        try:
+            import subprocess
+
+            output = subprocess.check_output(
+                ["nmcli", "-t", "-f", "SSID", "dev", "wifi"],
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=5,
+            )
+            networks = []
+            for line in output.splitlines():
+                ssid = line.strip()
+                if ssid:
+                    networks.append(ssid)
+            # Eliminar duplicados preservando el orden
+            seen = set()
+            unique_networks = []
+            for ssid in networks:
+                if ssid not in seen:
+                    seen.add(ssid)
+                    unique_networks.append(ssid)
+            return unique_networks
+        except Exception:
+            return []
 
     def get_credentials(self):
         return self.ssid_edit.text(), self.password_edit.text()
