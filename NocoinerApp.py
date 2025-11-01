@@ -424,11 +424,15 @@ class ConfigDialog(QDialog):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(6)
 
+        header_layout.addWidget(self.cancel_button)
+        header_layout.addStretch(1)
+
         title_label = QLabel("Selecciona una red WiFi visible:")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        header_layout.addStretch(1)
         header_layout.addWidget(title_label, 0, Qt.AlignCenter)
+
         header_layout.addStretch(1)
+        header_layout.addWidget(self.connect_button)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 8, 8, 8)
@@ -449,11 +453,12 @@ class ConfigDialog(QDialog):
         keyboard_layout = QHBoxLayout(self.keyboard_container)
         keyboard_layout.setContentsMargins(0, 0, 0, 0)
         keyboard_layout.setSpacing(6)
-        keyboard_layout.addWidget(self.cancel_button, 0, Qt.AlignBottom)
-        keyboard_layout.addWidget(self.keyboard, 1, Qt.AlignBottom)
-        keyboard_layout.addWidget(self.connect_button, 0, Qt.AlignBottom)
+        keyboard_layout.addStretch(1)
+        keyboard_layout.addWidget(self.keyboard, 0, Qt.AlignCenter)
+        keyboard_layout.addStretch(1)
 
-        layout.addWidget(self.keyboard_container)
+        self.keyboard_container.setVisible(False)
+        layout.addWidget(self.keyboard_container, 0, Qt.AlignCenter)
         self.setLayout(layout)
 
         self._load_wifi_networks()
@@ -526,11 +531,13 @@ class ConfigDialog(QDialog):
             self._show_keyboard()
 
     def _show_keyboard(self):
+        self.keyboard_container.setVisible(True)
         self.keyboard.setVisible(True)
         self.toggle_keyboard_button.setText("Ocultar teclado")
 
     def _hide_keyboard(self):
         self.keyboard.setVisible(False)
+        self.keyboard_container.setVisible(False)
         self.toggle_keyboard_button.setText("Mostrar teclado")
         self.keyboard.reset()
 
@@ -575,6 +582,7 @@ class OnScreenKeyboard(QWidget):
         self.setStyleSheet(
             "QPushButton { background-color: #222; color: white; padding: 4px; font-size: 12px; border-radius: 3px; }"
             "QPushButton:pressed { background-color: #444; }"
+            "QPushButton[isSymbol=\"true\"] { font-size: 10px; padding: 2px 4px; min-width: 32px; min-height: 28px; }"
         )
 
         main_layout = QVBoxLayout(self)
@@ -625,7 +633,7 @@ class OnScreenKeyboard(QWidget):
         for index, (char, shift_char) in enumerate(symbols_row):
             row = index // symbols_columns
             column = index % symbols_columns
-            button = self._create_char_button(char, shift_char)
+            button = self._create_char_button(char, shift_char, is_symbol=True)
             symbols_layout.addWidget(button, row, column)
 
         symbols_container = QVBoxLayout()
@@ -660,10 +668,16 @@ class OnScreenKeyboard(QWidget):
 
         main_layout.addLayout(control_layout)
 
-    def _create_char_button(self, char: str, shift_char: str = None) -> QPushButton:
+    def _create_char_button(self, char: str, shift_char: str = None, *, is_symbol: bool = False) -> QPushButton:
         button = QPushButton(char)
         button.setProperty("char_lower", char)
         button.setProperty("char_upper", shift_char if shift_char is not None else char.upper())
+        if is_symbol:
+            button.setProperty("isSymbol", True)
+        else:
+            button.setProperty("isSymbol", False)
+        button.style().unpolish(button)
+        button.style().polish(button)
         button.clicked.connect(partial(self._handle_char_button, button))
         self.char_buttons.append(button)
         return button
