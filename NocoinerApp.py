@@ -423,15 +423,12 @@ class ConfigDialog(QDialog):
 
         header_layout = QHBoxLayout()
         header_layout.setSpacing(6)
-        header_layout.addWidget(self.cancel_button)
-        header_layout.addStretch(1)
 
         title_label = QLabel("Selecciona una red WiFi visible:")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        header_layout.addWidget(title_label, 0, Qt.AlignCenter)
-
         header_layout.addStretch(1)
-        header_layout.addWidget(self.connect_button)
+        header_layout.addWidget(title_label, 0, Qt.AlignCenter)
+        header_layout.addStretch(1)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 8, 8, 8)
@@ -446,8 +443,17 @@ class ConfigDialog(QDialog):
         layout.addLayout(header_layout)
         layout.addLayout(ssid_controls_layout)
         layout.addLayout(form_layout)
-        layout.addWidget(self.keyboard, 0, Qt.AlignCenter)
         layout.addStretch(1)
+
+        self.keyboard_container = QWidget()
+        keyboard_layout = QHBoxLayout(self.keyboard_container)
+        keyboard_layout.setContentsMargins(0, 0, 0, 0)
+        keyboard_layout.setSpacing(6)
+        keyboard_layout.addWidget(self.cancel_button, 0, Qt.AlignBottom)
+        keyboard_layout.addWidget(self.keyboard, 1, Qt.AlignBottom)
+        keyboard_layout.addWidget(self.connect_button, 0, Qt.AlignBottom)
+
+        layout.addWidget(self.keyboard_container)
         self.setLayout(layout)
 
         self._load_wifi_networks()
