@@ -4,6 +4,7 @@ from logging import Logger
 import requests
 import time
 import socket
+from functools import partial
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
@@ -16,12 +17,14 @@ from PyQt5.QtWidgets import (
     QDialog,
     QLineEdit,
     QFormLayout,
-    QListWidget,
     QHBoxLayout,
     QCheckBox,
     QMessageBox,
+    QSizePolicy,
+    QScrollArea,
+    QButtonGroup,
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QEvent
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
 BTC_UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
@@ -339,48 +342,135 @@ class ConfigDialog(QDialog):
 
         self.selected_ssid = current_ssid
 
-        self.ssid_list = QListWidget()
-        self.ssid_list.itemSelectionChanged.connect(self._handle_ssid_selection)
+        self.ssid_scroll = QScrollArea()
+        self.ssid_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.ssid_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.ssid_scroll.setWidgetResizable(True)
+        self.ssid_scroll.setFixedHeight(58)
+        self.ssid_scroll.setMaximumWidth(280)
+        self.ssid_scroll.setStyleSheet("QScrollArea { background-color: #1a1a1a; border: 1px solid #222; }")
+
+        self.ssid_container = QWidget()
+        self.ssid_layout = QHBoxLayout(self.ssid_container)
+        self.ssid_layout.setContentsMargins(4, 4, 4, 4)
+        self.ssid_layout.setSpacing(6)
+        self.ssid_scroll.setWidget(self.ssid_container)
+        self.ssid_button_group = QButtonGroup(self)
+        self.ssid_button_group.setExclusive(True)
+        self.ssid_button_group.buttonClicked.connect(self._handle_ssid_button_clicked)
 
         self.ssid_edit = QLineEdit(current_ssid)
+        self.ssid_edit.setStyleSheet("font-size: 14px; padding: 4px 6px;")
+        self.ssid_edit.textEdited.connect(self._clear_ssid_selection)
         self.password_edit = QLineEdit(current_password)
+        self.password_edit.setStyleSheet("font-size: 14px; padding: 4px 6px;")
         self.password_edit.setEchoMode(QLineEdit.Password)
+        self.password_edit.installEventFilter(self)
 
         self.show_password_checkbox = QCheckBox("Mostrar contraseña")
+        self.show_password_checkbox.setStyleSheet("font-size: 12px;")
         self.show_password_checkbox.stateChanged.connect(self._toggle_password_visibility)
 
-        form_layout = QFormLayout()
-        form_layout.addRow("SSID manual:", self.ssid_edit)
-        form_layout.addRow("Password:", self.password_edit)
-        form_layout.addRow("", self.show_password_checkbox)
+        password_row_widget = QWidget()
+        password_row_layout = QHBoxLayout(password_row_widget)
+        password_row_layout.setContentsMargins(0, 0, 0, 0)
+        password_row_layout.setSpacing(6)
+        password_row_layout.addWidget(self.password_edit)
+        password_row_layout.addWidget(self.show_password_checkbox)
 
-        buttons_layout = QHBoxLayout()
+        form_layout = QFormLayout()
+        form_layout.setSpacing(4)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.addRow("SSID manual:", self.ssid_edit)
+        form_layout.addRow("Password:", password_row_widget)
+
+        self.keyboard = OnScreenKeyboard(self.password_edit, self)
+        self.keyboard.setVisible(False)
+        self.keyboard.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.keyboard.setMinimumWidth(320)
+
+        self.toggle_keyboard_button = QPushButton("Mostrar teclado")
+        self.toggle_keyboard_button.setStyleSheet("font-size: 12px; padding: 4px 8px;")
+        self.toggle_keyboard_button.clicked.connect(self._toggle_keyboard_visibility)
+        self.toggle_keyboard_button.setFixedHeight(58)
+
         self.connect_button = QPushButton("Conectar")
         self.cancel_button = QPushButton("Cancelar")
+        for btn in (self.cancel_button, self.connect_button):
+            btn.setStyleSheet("font-size: 12px; padding: 4px 10px;")
         self.connect_button.clicked.connect(self._handle_connect)
         self.cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(self.cancel_button)
-        buttons_layout.addWidget(self.connect_button)
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(20)
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(6)
+        header_layout.addWidget(self.cancel_button)
+        header_layout.addStretch(1)
 
         title_label = QLabel("Selecciona una red WiFi visible:")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title_label)
-        layout.addWidget(self.ssid_list)
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        header_layout.addWidget(title_label, 0, Qt.AlignCenter)
+
+        header_layout.addStretch(1)
+        header_layout.addWidget(self.connect_button)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        ssid_controls_layout = QHBoxLayout()
+        ssid_controls_layout.setContentsMargins(0, 0, 0, 0)
+        ssid_controls_layout.setSpacing(6)
+        ssid_controls_layout.addWidget(self.ssid_scroll)
+        ssid_controls_layout.addWidget(self.toggle_keyboard_button)
+
+        layout.addLayout(header_layout)
+        layout.addLayout(ssid_controls_layout)
         layout.addLayout(form_layout)
-        layout.addLayout(buttons_layout)
+        layout.addWidget(self.keyboard, 0, Qt.AlignCenter)
+        layout.addStretch(1)
         self.setLayout(layout)
 
         self._load_wifi_networks()
 
-    def _handle_ssid_selection(self):
-        selected_items = self.ssid_list.selectedItems()
-        if selected_items:
-            self.selected_ssid = selected_items[0].text()
-            self.ssid_edit.setText(self.selected_ssid)
+    def _handle_ssid_button_clicked(self, button):
+        self.selected_ssid = button.text()
+        self.ssid_edit.setText(self.selected_ssid)
+
+    def _clear_ssid_selection(self):
+        for btn in self.ssid_button_group.buttons():
+            btn.setChecked(False)
+        self.selected_ssid = self.ssid_edit.text()
+
+    def _populate_ssid_buttons(self, networks):
+        while self.ssid_layout.count():
+            item = self.ssid_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        for btn in list(self.ssid_button_group.buttons()):
+            self.ssid_button_group.removeButton(btn)
+
+        if networks:
+            for ssid in networks:
+                button = QPushButton(ssid)
+                button.setCheckable(True)
+                button.setStyleSheet(
+                    "QPushButton { background-color: #222; color: white; font-size: 12px; padding: 6px 10px; border-radius: 4px; }"
+                    "QPushButton:checked { background-color: #2f6fed; }"
+                    "QPushButton:pressed { background-color: #444; }"
+                )
+                button.setMinimumWidth(120)
+                self.ssid_layout.addWidget(button)
+                self.ssid_button_group.addButton(button)
+                if ssid == self.selected_ssid:
+                    button.setChecked(True)
+            self.ssid_layout.addStretch(1)
+        else:
+            info_label = QLabel("No se encontraron redes WiFi visibles")
+            info_label.setStyleSheet("font-size: 12px; color: #bbb;")
+            self.ssid_layout.addWidget(info_label)
+            self.ssid_layout.addStretch(1)
 
     def _toggle_password_visibility(self, state):
         if state == Qt.Checked:
@@ -396,14 +486,27 @@ class ConfigDialog(QDialog):
 
     def _load_wifi_networks(self):
         networks = self._scan_wifi_networks()
-        if networks:
-            self.ssid_list.addItems(networks)
-            matching_items = self.ssid_list.findItems(self.selected_ssid, Qt.MatchExactly)
-            if matching_items:
-                matching_items[0].setSelected(True)
+        self._populate_ssid_buttons(networks)
+
+    def eventFilter(self, obj, event):
+        if obj is self.password_edit and event.type() in (QEvent.FocusIn, QEvent.MouseButtonPress):
+            self._show_keyboard()
+        return super().eventFilter(obj, event)
+
+    def _toggle_keyboard_visibility(self):
+        if self.keyboard.isVisible():
+            self._hide_keyboard()
         else:
-            self.ssid_list.addItem("No se encontraron redes WiFi visibles")
-            self.ssid_list.setEnabled(False)
+            self._show_keyboard()
+
+    def _show_keyboard(self):
+        self.keyboard.setVisible(True)
+        self.toggle_keyboard_button.setText("Ocultar teclado")
+
+    def _hide_keyboard(self):
+        self.keyboard.setVisible(False)
+        self.toggle_keyboard_button.setText("Mostrar teclado")
+        self.keyboard.reset()
 
     @staticmethod
     def _scan_wifi_networks():
@@ -434,6 +537,92 @@ class ConfigDialog(QDialog):
 
     def get_credentials(self):
         return self.ssid_edit.text(), self.password_edit.text()
+
+
+class OnScreenKeyboard(QWidget):
+    def __init__(self, target_input: QLineEdit, parent=None):
+        super().__init__(parent)
+        self.target_input = target_input
+        self.shift_enabled = False
+        self.char_buttons = []
+
+        self.setStyleSheet(
+            "QPushButton { background-color: #222; color: white; padding: 4px; font-size: 12px; border-radius: 3px; }"
+            "QPushButton:pressed { background-color: #444; }"
+        )
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        rows = [
+            "1234567890",
+            "qwertyuiop",
+            "asdfghjkl",
+            "zxcvbnm",
+        ]
+
+        for row_chars in rows:
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(4)
+            for char in row_chars:
+                button = self._create_char_button(char)
+                row_layout.addWidget(button)
+            main_layout.addLayout(row_layout)
+
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(4)
+
+        self.shift_button = QPushButton("Mayús")
+        self.shift_button.setCheckable(True)
+        self.shift_button.toggled.connect(self._toggle_shift)
+        control_layout.addWidget(self.shift_button)
+
+        space_button = QPushButton("Espacio")
+        space_button.clicked.connect(lambda: self.target_input.insert(" "))
+        control_layout.addWidget(space_button)
+
+        backspace_button = QPushButton("Borrar")
+        backspace_button.clicked.connect(self.target_input.backspace)
+        control_layout.addWidget(backspace_button)
+
+        clear_button = QPushButton("Limpiar")
+        clear_button.clicked.connect(self.target_input.clear)
+        control_layout.addWidget(clear_button)
+
+        main_layout.addLayout(control_layout)
+
+    def _create_char_button(self, char: str) -> QPushButton:
+        button = QPushButton(char)
+        button.setProperty("char", char)
+        button.clicked.connect(partial(self._handle_char_button, button))
+        self.char_buttons.append(button)
+        return button
+
+    def _handle_char_button(self, button: QPushButton):
+        char = button.property("char")
+        if not char:
+            return
+        if self.shift_enabled:
+            self.target_input.insert(char.upper())
+        else:
+            self.target_input.insert(char)
+
+    def _toggle_shift(self, checked: bool):
+        self.shift_enabled = checked
+        self._update_char_buttons()
+
+    def _update_char_buttons(self):
+        for button in self.char_buttons:
+            char = button.property("char")
+            if char:
+                button.setText(char.upper() if self.shift_enabled else char.lower())
+
+    def reset(self):
+        if self.shift_button.isChecked():
+            self.shift_button.setChecked(False)
+        else:
+            self._toggle_shift(False)
 
 
 if __name__ == "__main__":
