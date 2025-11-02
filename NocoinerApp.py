@@ -5,7 +5,10 @@ from logging import Logger
 import requests
 import time
 import socket
+import subprocess
+import shutil
 from functools import partial
+from typing import Tuple
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtGui import QPixmap, QPainter, QColor
@@ -371,6 +374,7 @@ class ConfigDialog(QDialog):
         self.setStyleSheet("background-color: #111; color: white;")
 
         self.selected_ssid = current_ssid
+        self.wifi_interface = self._detect_wifi_interface()
 
         self.ssid_scroll = QScrollArea()
         self.ssid_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -509,10 +513,38 @@ class ConfigDialog(QDialog):
             self.password_edit.setEchoMode(QLineEdit.Password)
 
     def _handle_connect(self):
-        if not self.ssid_edit.text():
+        ssid = self.ssid_edit.text().strip()
+        password = self.password_edit.text()
+
+        if not ssid:
             QMessageBox.warning(self, "SSID requerido", "Selecciona o introduce un SSID para continuar.")
             return
-        self.accept()
+
+        try:
+            success = False
+            message = ""
+
+            if self._command_available("nmcli"):
+                success, message = self._connect_with_nmcli(ssid, password)
+            elif self._command_available("wpa_cli"):
+                success, message = self._connect_with_wpa_cli(ssid, password)
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    "No se encontró ninguna herramienta compatible (nmcli o wpa_cli) para gestionar la WiFi.",
+                )
+                return
+
+            if success:
+                QMessageBox.information(self, "Conectado", message or f"Se estableció conexión con '{ssid}'.")
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Error de conexión", message or "No se pudo establecer la conexión.")
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(self, "Error de conexión", "La conexión tardó demasiado y fue cancelada.")
+        except Exception as exc:
+            QMessageBox.critical(self, "Error de conexión", str(exc))
 
     def _load_wifi_networks(self):
         networks = self._scan_wifi_networks()
@@ -530,6 +562,7 @@ class ConfigDialog(QDialog):
             self._show_keyboard()
 
     def _show_keyboard(self):
+        self.keyboard.reset()
         self.keyboard.setVisible(True)
         self.toggle_keyboard_button.setText("Ocultar teclado")
 
@@ -538,32 +571,186 @@ class ConfigDialog(QDialog):
         self.toggle_keyboard_button.setText("Mostrar teclado")
         self.keyboard.reset()
 
-    @staticmethod
-    def _scan_wifi_networks():
-        try:
-            import subprocess
+    def _command_available(self, command: str) -> bool:
+        return shutil.which(command) is not None
 
-            output = subprocess.check_output(
-                ["nmcli", "-t", "-f", "SSID", "dev", "wifi"],
-                stderr=subprocess.STDOUT,
+    def _connect_with_nmcli(self, ssid: str, password: str) -> Tuple[bool, str]:
+        command = ["nmcli", "dev", "wifi", "connect", ssid]
+        if password:
+            command.extend(["password", password])
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode == 0:
+            return True, result.stdout.strip() or f"Se estableció conexión con '{ssid}'."
+
+        error_output = result.stderr.strip() or result.stdout.strip()
+        if not error_output:
+            error_output = "Error desconocido al conectar con nmcli."
+        return False, error_output
+
+    def _connect_with_wpa_cli(self, ssid: str, password: str) -> Tuple[bool, str]:
+        try:
+            network_id = self._get_or_create_wpa_network(ssid)
+        except RuntimeError as exc:
+            return False, str(exc)
+
+        try:
+            self._configure_wpa_network(network_id, ssid, password)
+            self._enable_wpa_network(network_id)
+            if self._wait_for_wpa_connection():
+                return True, f"Se estableció conexión con '{ssid}' usando wpa_cli."
+            return False, "La red no se conectó en el tiempo esperado (wpa_cli)."
+        except RuntimeError as exc:
+            return False, str(exc)
+
+    def _run_wpa_cli(self, *args: str) -> str:
+        command = ["wpa_cli", "-i", self.wifi_interface, *args]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+        if result.returncode != 0:
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+            message = stderr or stdout or "Fallo al ejecutar wpa_cli."
+            raise RuntimeError(message)
+
+        return result.stdout.strip()
+
+    def _get_or_create_wpa_network(self, ssid: str) -> str:
+        try:
+            networks_output = self._run_wpa_cli("list_networks")
+        except RuntimeError as exc:
+            raise RuntimeError(f"No se pudo listar redes en wpa_cli: {exc}") from exc
+
+        network_id = None
+        for line in networks_output.splitlines()[1:]:
+            parts = line.split("\t")
+            if len(parts) >= 2 and parts[1] == ssid:
+                network_id = parts[0]
+                break
+
+        if network_id is None:
+            network_id = self._run_wpa_cli("add_network").strip()
+            if not network_id.isdigit():
+                raise RuntimeError(f"wpa_cli devolvió un identificador inválido: '{network_id}'.")
+
+        return network_id
+
+    def _configure_wpa_network(self, network_id: str, ssid: str, password: str) -> None:
+        quoted_ssid = f'"{ssid}"'
+        self._run_wpa_cli("set_network", network_id, "ssid", quoted_ssid)
+
+        if password:
+            quoted_psk = f'"{password}"'
+            self._run_wpa_cli("set_network", network_id, "psk", quoted_psk)
+            self._run_wpa_cli("set_network", network_id, "key_mgmt", "WPA-PSK")
+        else:
+            self._run_wpa_cli("set_network", network_id, "key_mgmt", "NONE")
+            try:
+                self._run_wpa_cli("set_network", network_id, "psk", '""')
+            except RuntimeError:
+                pass
+
+    def _enable_wpa_network(self, network_id: str) -> None:
+        self._run_wpa_cli("enable_network", network_id)
+        self._run_wpa_cli("select_network", network_id)
+        self._run_wpa_cli("save_config")
+        self._run_wpa_cli("reconnect")
+
+    def _wait_for_wpa_connection(self, timeout: int = 25) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                status = self._run_wpa_cli("status")
+            except RuntimeError:
+                break
+
+            if "wpa_state=COMPLETED" in status:
+                return True
+            time.sleep(1)
+        return False
+
+    def _detect_wifi_interface(self) -> str:
+        default_interface = "wlan0"
+        try:
+            result = subprocess.run(
+                ["iw", "dev"],
+                capture_output=True,
                 text=True,
                 timeout=5,
             )
-            networks = []
-            for line in output.splitlines():
-                ssid = line.strip()
-                if ssid:
-                    networks.append(ssid)
-            # Eliminar duplicados preservando el orden
-            seen = set()
-            unique_networks = []
-            for ssid in networks:
-                if ssid not in seen:
-                    seen.add(ssid)
-                    unique_networks.append(ssid)
-            return unique_networks
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("Interface "):
+                    return line.split()[1]
+        except Exception:
+            pass
+        return default_interface
+
+    def _scan_wifi_networks(self):
+        try:
+            if shutil.which("nmcli"):
+                output = subprocess.check_output(
+                    ["nmcli", "-t", "-f", "SSID", "dev", "wifi"],
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=8,
+                )
+                networks = []
+                for line in output.splitlines():
+                    ssid = line.strip()
+                    if ssid:
+                        networks.append(ssid)
+                return self._deduplicate_networks(networks)
+
+            if shutil.which("wpa_cli"):
+                subprocess.run(
+                    ["wpa_cli", "-i", self.wifi_interface, "scan"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                time.sleep(2)
+                result = subprocess.run(
+                    ["wpa_cli", "-i", self.wifi_interface, "scan_results"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode != 0:
+                    return []
+                networks = []
+                for line in result.stdout.splitlines()[2:]:
+                    parts = line.split("\t")
+                    if len(parts) >= 5:
+                        ssid = parts[4].strip()
+                        if ssid:
+                            networks.append(ssid)
+                return self._deduplicate_networks(networks)
         except Exception:
             return []
+
+        return []
+
+    @staticmethod
+    def _deduplicate_networks(networks):
+        seen = set()
+        unique_networks = []
+        for ssid in networks:
+            if ssid not in seen:
+                seen.add(ssid)
+                unique_networks.append(ssid)
+        return unique_networks
 
     def get_credentials(self):
         return self.ssid_edit.text(), self.password_edit.text()
