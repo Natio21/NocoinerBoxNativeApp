@@ -509,10 +509,43 @@ class ConfigDialog(QDialog):
             self.password_edit.setEchoMode(QLineEdit.Password)
 
     def _handle_connect(self):
-        if not self.ssid_edit.text():
+        ssid = self.ssid_edit.text().strip()
+        password = self.password_edit.text()
+
+        if not ssid:
             QMessageBox.warning(self, "SSID requerido", "Selecciona o introduce un SSID para continuar.")
             return
-        self.accept()
+
+        try:
+            import subprocess
+
+            command = ["nmcli", "dev", "wifi", "connect", ssid]
+            if password:
+                command.extend(["password", password])
+
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+
+            if result.returncode == 0:
+                QMessageBox.information(self, "Conectado", f"Se estableció conexión con '{ssid}'.")
+                self.accept()
+            else:
+                error_output = result.stderr.strip() or result.stdout.strip() or "Error desconocido al conectar."
+                QMessageBox.critical(
+                    self,
+                    "Error de conexión",
+                    error_output,
+                )
+        except FileNotFoundError:
+            QMessageBox.critical(self, "Error", "La herramienta 'nmcli' no está disponible en el sistema.")
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(self, "Error de conexión", "La conexión tardó demasiado y fue cancelada.")
+        except Exception as exc:
+            QMessageBox.critical(self, "Error de conexión", str(exc))
 
     def _load_wifi_networks(self):
         networks = self._scan_wifi_networks()
