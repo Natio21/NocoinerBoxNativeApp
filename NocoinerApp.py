@@ -719,7 +719,7 @@ class OnScreenKeyboard(QWidget):
         #log size_hint
         print(f"Button '{button.text()}' size hint: {size_hint.width()}")
         button.setMinimumSize(
-            size_hint.width()//3,
+            size_hint.width()//4,
             #self._button_size_increase,
             #size_hint.width() + self._button_size_increase,
             size_hint.height()# + self._button_size_increase,
