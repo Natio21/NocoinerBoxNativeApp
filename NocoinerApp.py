@@ -422,17 +422,16 @@ class ConfigDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
 
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(6)
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignCenter)
 
-        header_layout.addWidget(self.cancel_button)
-        header_layout.addStretch(1)
+        header_layout.addWidget(self.cancel_button, 0, Qt.AlignVCenter)
 
         title_label = QLabel("Selecciona una red WiFi visible:")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         header_layout.addWidget(title_label, 0, Qt.AlignCenter)
 
-        header_layout.addStretch(1)
-        header_layout.addWidget(self.connect_button)
+        header_layout.addWidget(self.connect_button, 0, Qt.AlignVCenter)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 8, 8, 8)
