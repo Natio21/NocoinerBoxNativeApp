@@ -587,11 +587,38 @@ class OnScreenKeyboard(QWidget):
         keys_container = QHBoxLayout()
         keys_container.setSpacing(4)
 
+        numeric_keys = [
+            ("1", "!"),
+            ("2", "@"),
+            ("3", "#"),
+            ("4", "$"),
+            ("5", "%"),
+            ("6", "^"),
+            ("7", "&"),
+            ("8", "*"),
+            ("9", "("),
+            ("0", ")"),
+        ]
+
+        numeric_layout = QGridLayout()
+        numeric_layout.setSpacing(4)
+        numeric_columns = 4
+        for index, (char, shift_char) in enumerate(numeric_keys):
+            row = index // numeric_columns
+            column = index % numeric_columns
+            button = self._create_char_button(char, shift_char)
+            numeric_layout.addWidget(button, row, column)
+
+        numeric_container = QVBoxLayout()
+        numeric_container.setSpacing(4)
+        numeric_container.addLayout(numeric_layout)
+        numeric_container.addStretch(1)
+
+
         letter_rows_layout = QVBoxLayout()
         letter_rows_layout.setSpacing(4)
 
         rows = [
-            [("1", "!"), ("2", "@"), ("3", "#"), ("4", "$"), ("5", "%"), ("6", "^"), ("7", "&"), ("8", "*"), ("9", "("), ("0", ")")],
             [("q", "Q"), ("w", "W"), ("e", "E"), ("r", "R"), ("t", "T"), ("y", "Y"), ("u", "U"), ("i", "I"), ("o", "O"), ("p", "P")],
             [("a", "A"), ("s", "S"), ("d", "D"), ("f", "F"), ("g", "G"), ("h", "H"), ("j", "J"), ("k", "K"), ("l", "L"), ("ñ", "Ñ")],
             [("z", "Z"), ("x", "X"), ("c", "C"), ("v", "V"), ("b", "B"), ("n", "N"), ("m", "M")],
@@ -636,6 +663,7 @@ class OnScreenKeyboard(QWidget):
         symbols_container.addLayout(symbols_layout)
         symbols_container.addStretch(1)
 
+        keys_container.addLayout(numeric_container)
         keys_container.addLayout(letter_rows_layout)
         keys_container.addLayout(symbols_container)
 
