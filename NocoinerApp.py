@@ -580,6 +580,8 @@ class OnScreenKeyboard(QWidget):
             "QPushButton:pressed { background-color: #444; }"
         )
 
+        self._button_size_increase = 3
+
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -673,19 +675,23 @@ class OnScreenKeyboard(QWidget):
         control_layout.setSpacing(4)
 
         self.shift_button = QPushButton("Shift")
+        self._apply_button_size(self.shift_button)
         self.shift_button.setCheckable(True)
         self.shift_button.toggled.connect(self._toggle_shift)
         control_layout.addWidget(self.shift_button)
 
         space_button = QPushButton("Espacio")
+        self._apply_button_size(space_button)
         space_button.clicked.connect(lambda: self.target_input.insert(" "))
         control_layout.addWidget(space_button)
 
         backspace_button = QPushButton("Borrar")
+        self._apply_button_size(backspace_button)
         backspace_button.clicked.connect(self.target_input.backspace)
         control_layout.addWidget(backspace_button)
 
         clear_button = QPushButton("Limpiar")
+        self._apply_button_size(clear_button)
         clear_button.clicked.connect(self.target_input.clear)
         control_layout.addWidget(clear_button)
 
@@ -697,7 +703,15 @@ class OnScreenKeyboard(QWidget):
         button.setProperty("char_upper", shift_char if shift_char is not None else char.upper())
         button.clicked.connect(partial(self._handle_char_button, button))
         self.char_buttons.append(button)
+        self._apply_button_size(button)
         return button
+
+    def _apply_button_size(self, button: QPushButton):
+        size_hint = button.sizeHint()
+        button.setMinimumSize(
+            size_hint.width() + self._button_size_increase,
+            size_hint.height() + self._button_size_increase,
+        )
 
     def _handle_char_button(self, button: QPushButton):
         lower_char = button.property("char_lower")
