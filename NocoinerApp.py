@@ -580,7 +580,7 @@ class OnScreenKeyboard(QWidget):
             "QPushButton:pressed { background-color: #444; }"
         )
 
-        self._button_size_increase = 3
+        self._button_size_increase = 12
 
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(4)
@@ -706,11 +706,20 @@ class OnScreenKeyboard(QWidget):
         self._apply_button_size(button)
         return button
 
+
+    '''
+        Apply size increase to button based on its size hint.
+        Args:
+            button (QPushButton): The button to apply size increase to.
+        
+    '''
     def _apply_button_size(self, button: QPushButton):
         size_hint = button.sizeHint()
         button.setMinimumSize(
-            size_hint.width() + self._button_size_increase,
-            size_hint.height() + self._button_size_increase,
+            self._button_size_increase,
+            #size_hint.width() + self._button_size_increase,
+            size_hint.height()# + self._button_size_increase,
+            #self._button_size_increase,self._button_size_increase
         )
 
     def _handle_char_button(self, button: QPushButton):
