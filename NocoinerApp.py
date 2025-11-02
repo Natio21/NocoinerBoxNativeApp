@@ -585,7 +585,7 @@ class OnScreenKeyboard(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         keys_container = QHBoxLayout()
-        keys_container.setSpacing(4)
+        keys_container.setSpacing(10)
 
         numeric_keys = [
             ("1", "!"),
