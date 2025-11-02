@@ -173,6 +173,7 @@ class BTCViewer(QWidget):
         # Ejecutar una vez al inicio
         self.update_btc_price()
         self.update_summary()
+        self._next_summary_retry = 0
 
         self.showFullScreen()
 
@@ -307,7 +308,15 @@ class BTCViewer(QWidget):
 
     def update_summary(self):
         """Fetch and display only the miner summary info."""
+        if getattr(self, "_next_summary_retry", 0) > time.time():
+            return
+
         summary = self.get_summary_data()
+        if summary is None:
+            self._next_summary_retry = time.time() + 2
+            return
+
+        self._next_summary_retry = 0
         miner = summary.get("miner", {})
         instant_hashrate = miner.get("instant_hashrate", "--")
         pcb_temp = miner.get("pcb_temp", {})
@@ -349,7 +358,7 @@ class BTCViewer(QWidget):
             return resp.json()
         except Exception as e:
             print(f"Fetch summary error: {e}")
-            return {}
+            return None
 
 
 class ConfigDialog(QDialog):
