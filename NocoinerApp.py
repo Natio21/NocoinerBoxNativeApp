@@ -1,3 +1,4 @@
+import logging
 import sys
 from logging import Logger
 
@@ -715,8 +716,11 @@ class OnScreenKeyboard(QWidget):
     '''
     def _apply_button_size(self, button: QPushButton):
         size_hint = button.sizeHint()
+        #log size_hint
+        print(f"Button '{button.text()}' size hint: {size_hint.width()}")
         button.setMinimumSize(
-            self._button_size_increase,
+            23,
+            #self._button_size_increase,
             #size_hint.width() + self._button_size_increase,
             size_hint.height()# + self._button_size_increase,
             #self._button_size_increase,self._button_size_increase
