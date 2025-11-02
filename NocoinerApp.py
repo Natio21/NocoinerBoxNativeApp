@@ -846,6 +846,7 @@ class OnScreenKeyboard(QWidget):
             row = index // symbols_columns
             column = index % symbols_columns
             button = self._create_char_button(char, shift_char)
+            button.setFixedHeight(28)
             symbols_layout.addWidget(button, row, column)
 
         symbols_container = QVBoxLayout()
