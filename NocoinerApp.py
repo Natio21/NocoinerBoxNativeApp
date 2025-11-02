@@ -313,7 +313,7 @@ class BTCViewer(QWidget):
 
         summary = self.get_summary_data()
         if summary is None:
-            self._next_summary_retry = time.time() + 2
+            self._next_summary_retry = time.time() + 4
             return
 
         self._next_summary_retry = 0
@@ -624,7 +624,7 @@ class OnScreenKeyboard(QWidget):
 
         symbols_layout = QGridLayout()
         symbols_layout.setSpacing(4)
-        symbols_columns = 3
+        symbols_columns = 5
         for index, (char, shift_char) in enumerate(symbols_row):
             row = index // symbols_columns
             column = index % symbols_columns
