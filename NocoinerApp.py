@@ -168,8 +168,9 @@ class BTCViewer(QWidget):
         self.price_timer.timeout.connect(self.update_btc_price)
         self.price_timer.start(BTC_UPDATE_INTERVAL_MS)
 
-        # Temporizador para actualizar datos de summary
+        # Temporizador para actualizar datos de summary (rearmable)
         self.summary_timer = QTimer(self)
+        self.summary_timer.setSingleShot(True)
         self.summary_timer.timeout.connect(self.update_summary)
         self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
 
@@ -316,9 +317,12 @@ class BTCViewer(QWidget):
     def update_summary(self):
         """Fetch and display only the miner summary info."""
         if self._summary_fetch_in_progress:
+            self._schedule_next_summary()
             return
 
         if getattr(self, "_next_summary_retry", 0) > time.time():
+            delay_ms = int(max((self._next_summary_retry - time.time()) * 1000, SUMMARY_UPDATE_INTERVAL_MS))
+            self._schedule_next_summary(delay_ms)
             return
 
         self._summary_fetch_in_progress = True
@@ -354,6 +358,7 @@ class BTCViewer(QWidget):
         if summary is None:
             self._next_summary_retry = time.time() + 4
             self._update_connection_info()
+            self._schedule_next_summary(int((self._next_summary_retry - time.time()) * 1000))
             return
 
         self._next_summary_retry = 0
@@ -374,17 +379,26 @@ class BTCViewer(QWidget):
         self.temp_label.setText(f"Temperatura PCB: {temp_max} °C")
         self.pool_label.setText(f"Pool: {pool0_url}")
         self._update_connection_info()
+        self._schedule_next_summary()
 
     def _handle_summary_error(self, error_message: str):
         logging.warning("Error al obtener summary: %s", error_message)
         self._summary_fetch_in_progress = False
         self._next_summary_retry = time.time() + 4
         self._update_connection_info()
+        self._schedule_next_summary(int((self._next_summary_retry - time.time()) * 1000))
 
     def _update_connection_info(self):
         local_ip = self.get_local_ip()
         self.ip_label.setText(f"Ip: {local_ip}")
         self.config_natio_box_ip_label.setText(f"Config: {local_ip}:8000")
+
+    def _schedule_next_summary(self, delay_ms: int = SUMMARY_UPDATE_INTERVAL_MS):
+        """Rearm the summary timer after the given delay."""
+        delay_ms = max(delay_ms, SUMMARY_UPDATE_INTERVAL_MS)
+        if self.summary_timer.isActive():
+            self.summary_timer.stop()
+        self.summary_timer.start(delay_ms)
 
 
 class SummaryWorkerSignals(QObject):
