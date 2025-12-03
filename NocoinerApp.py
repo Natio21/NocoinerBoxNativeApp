@@ -11,7 +11,6 @@ from functools import partial
 from typing import Tuple
 
 from PyQt5.QtGui import QPixmap, QPainter, QColor
-from PyQt5.QtGui import QPixmap, QPainter, QColor
 from PyQt5.QtWidgets import (
     QApplication,
     QLabel,
@@ -29,7 +28,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
     QButtonGroup,
 )
-from PyQt5.QtCore import Qt, QTimer, QEvent
+from PyQt5.QtCore import Qt, QTimer, QEvent, QRunnable, QThreadPool, pyqtSignal, QObject
 
 API_URL = "https://www.bitmex.com/api/v1/trade?symbol=XBT&count=1&reverse=true"
 BTC_UPDATE_INTERVAL_MS = 5000  # refrescar cada 5 s
@@ -174,6 +173,10 @@ class BTCViewer(QWidget):
         self.summary_timer.timeout.connect(self.update_summary)
         self.summary_timer.start(SUMMARY_UPDATE_INTERVAL_MS)
 
+        # Pool de hilos para tareas de red
+        self.thread_pool = QThreadPool.globalInstance()
+        self._summary_fetch_in_progress = False
+
         # Ejecutar una vez al inicio
         self.update_btc_price()
         self.update_summary()
@@ -312,35 +315,17 @@ class BTCViewer(QWidget):
 
     def update_summary(self):
         """Fetch and display only the miner summary info."""
+        if self._summary_fetch_in_progress:
+            return
+
         if getattr(self, "_next_summary_retry", 0) > time.time():
             return
 
-        summary = self.get_summary_data()
-        if summary is None:
-            self._next_summary_retry = time.time() + 4
-            return
-
-        self._next_summary_retry = 0
-        miner = summary.get("miner", {})
-        instant_hashrate = miner.get("instant_hashrate", "--")
-        pcb_temp = miner.get("pcb_temp", {})
-        temp_max = pcb_temp.get("max", "--")
-        pools = miner.get("pools", [])
-        pool0_url = pools[0].get("url", "--") if pools else "--"
-
-        # Formatear hashrate a dos decimales
-        if isinstance(instant_hashrate, (int, float)):
-            formatted_hashrate = f"{instant_hashrate:.2f}"
-        else:
-            formatted_hashrate = instant_hashrate
-
-        self.hashrate_label.setText(f"Hashrate: {formatted_hashrate} TH/s")
-        self.temp_label.setText(f"Temperatura PCB: {temp_max} °C")
-        self.pool_label.setText(f"Pool: {pool0_url}")
-
-        # Actualizar IP del minero
-        self.ip_label.setText(f"Ip: {self.get_local_ip()}")
-        self.config_natio_box_ip_label.setText(f"Config: {self.get_local_ip()}:8000")
+        self._summary_fetch_in_progress = True
+        worker = SummaryWorker(self.get_summary_data)
+        worker.signals.finished.connect(self._handle_summary_success)
+        worker.signals.error.connect(self._handle_summary_error)
+        self.thread_pool.start(worker)
 
     # Añade esta función para obtener la IP local
     def get_local_ip(self):
@@ -363,6 +348,62 @@ class BTCViewer(QWidget):
         except Exception as e:
             print(f"Fetch summary error: {e}")
             return None
+
+    def _handle_summary_success(self, summary: dict):
+        self._summary_fetch_in_progress = False
+        if summary is None:
+            self._next_summary_retry = time.time() + 4
+            self._update_connection_info()
+            return
+
+        self._next_summary_retry = 0
+        miner = summary.get("miner", {})
+        instant_hashrate = miner.get("instant_hashrate", "--")
+        pcb_temp = miner.get("pcb_temp", {})
+        temp_max = pcb_temp.get("max", "--")
+        pools = miner.get("pools", [])
+        pool0_url = pools[0].get("url", "--") if pools else "--"
+
+        # Formatear hashrate a dos decimales
+        if isinstance(instant_hashrate, (int, float)):
+            formatted_hashrate = f"{instant_hashrate:.2f}"
+        else:
+            formatted_hashrate = instant_hashrate
+
+        self.hashrate_label.setText(f"Hashrate: {formatted_hashrate} TH/s")
+        self.temp_label.setText(f"Temperatura PCB: {temp_max} °C")
+        self.pool_label.setText(f"Pool: {pool0_url}")
+        self._update_connection_info()
+
+    def _handle_summary_error(self, error_message: str):
+        logging.warning("Error al obtener summary: %s", error_message)
+        self._summary_fetch_in_progress = False
+        self._next_summary_retry = time.time() + 4
+        self._update_connection_info()
+
+    def _update_connection_info(self):
+        local_ip = self.get_local_ip()
+        self.ip_label.setText(f"Ip: {local_ip}")
+        self.config_natio_box_ip_label.setText(f"Config: {local_ip}:8000")
+
+
+class SummaryWorkerSignals(QObject):
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+
+class SummaryWorker(QRunnable):
+    def __init__(self, fetch_fn):
+        super().__init__()
+        self.fetch_fn = fetch_fn
+        self.signals = SummaryWorkerSignals()
+
+    def run(self):
+        try:
+            summary = self.fetch_fn()
+            self.signals.finished.emit(summary)
+        except Exception as e:
+            self.signals.error.emit(str(e))
 
 
 class ConfigDialog(QDialog):
